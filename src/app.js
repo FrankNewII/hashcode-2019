@@ -42,6 +42,37 @@ window.onChange = onChange;
 
 function artem(input) {
     console.log(input);
+    let categoriesH = {};
+    let categoriesV = {};
+    let used = [];
+
+    input.forEach( slide => slide.forEach( (val, id) => {
+        if ( id >= 3 ) {
+            if (slide[1] === "H") {
+                if ( categoriesH[val] ) {
+                    categoriesH[val].push(slide[0]);
+                } else {
+                    categoriesH[val] = [slide[0]];
+                }
+            } else {
+                if ( categoriesV[val] ) {
+                    categoriesV[val].push(slide[0]);
+                } else {
+                    categoriesV[val] = [slide[0]];
+                }
+            }
+
+        }
+    }) );
+
+    let lastCategory;
+    let newCategory;
+    let keysH = Object.keys(categoriesH);
+
+    keysH.forEach( cat => {
+        categoriesH[cat].forEach()
+    });
+    console.log();
 }
 
 function denis(input) {
