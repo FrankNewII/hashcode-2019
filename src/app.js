@@ -7,6 +7,11 @@ function run(e) {
         return parsedV;
     } );
 
+    input.shift();
+
+
+
+
 
 
 
