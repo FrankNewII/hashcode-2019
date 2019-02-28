@@ -2,19 +2,16 @@ function run(e) {
     e.preventDefault();
     let input = document.getElementById('input').value.split(/\n/).map( (v, id) => {
         let parsedV = v.split(' ');
-        parsedV.unshift(id);
+        parsedV.unshift(id - 1);
 
         return parsedV;
     } );
 
     input.shift();
-    input.pop();
 
     let outputArtem = artem(input);
     let outputDenis = denis(input);
     let outputAlexnder = alexander(input);
-
-
 
     document.getElementById('output').value = JSON.stringify(input);
 }
@@ -22,7 +19,7 @@ function run(e) {
 window.run = run;
 
 function artem(input) {
-
+    console.log(input);
 }
 
 function denis(input) {
