@@ -8,10 +8,11 @@ function run(e) {
     } );
 
     input.shift();
+    input.pop();
 
-
-
-
+    let outputArtem = artem(input);
+    let outputDenis = denis(input);
+    let outputAlexnder = alexander(input);
 
 
 
@@ -19,3 +20,15 @@ function run(e) {
 }
 
 window.run = run;
+
+function artem(input) {
+
+}
+
+function denis(input) {
+
+}
+
+function alexander(input) {
+
+}
