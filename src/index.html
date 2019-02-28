@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Hackaton 2019</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        .in, .out {
+            width: 50%;
+            float: left;
+        }
+
+        form:after {
+            clear: both;
+            display: block;
+            content: '';
+        }
+
+        textarea {
+            width: 100%;
+            resize: none;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+<form onsubmit="run(event)">
+    <div>
+        <button>Run</button>
+    </div>
+    <div class="in">
+        <label for="input"></label>
+        <textarea id="input" cols="30" rows="10"></textarea>
+    </div>
+    <div class="out">
+        <label for="output"></label>
+        <textarea id="output" cols="30" rows="10"></textarea>
+    </div>
+</form>
+<script src="/dist/bundle.js"></script>
+</body>
+</html>
