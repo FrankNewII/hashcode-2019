@@ -1,14 +1,3 @@
-function run(e) {
-    e.preventDefault();
-
-    let input = document.getElementById('input').value.split(/\n/).map( (v, id) => {
-        let parsedV = v.split(' ');
-        parsedV.unshift(id - 1);
-
-        return parsedV;
-    } );
-}
-
 function onChange(e) {
     var input = event.target;
 
@@ -67,6 +56,7 @@ function artem(input) {
 
     let lastCategory;
     let newCategory;
+
     let keysH = Object.keys(categoriesH);
 
     keysH.forEach( cat => {
