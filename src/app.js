@@ -33,66 +33,70 @@ window.onChange = onChange;
 
 
 function artem(slides, categoriesH, categoriesV) {
+
     let result = [];
 
-    let slide = slides[0];
-    let category = slide.categories.shift();
-    let lastSemiResult;
+    slides.sort(function (a, b) {
+       return a.categoriesSize - b.categoriesSize;
+    }).splice(Math.floor(slides.length / 2), Math.floor(slides.length / 3) * 2);
 
-    while(category) {
+    let k = 53332;
+    let t1 = performance.now();
+    let slideIdx = 0;
+    let slidesLength = slides.length;
 
-        let addedPics = getPicsFromCat(category, categoriesV);
+    while(k--) {
 
-        if (addedPics.addedSlides) {
+        let slide = slides[slideIdx++];
 
-            result.push(...addedPics.semiRes);
-            lastSemiResult = addedPics.semiRes;
-            slide = addedPics.semiRes[addedPics.semiRes.length - 1];
+        if (!slide) {
+            break;
+        }
 
-        } else {
-
-            if (slide.categories.length) {
-                category = slide.categories.shift();
-            } else {
-
-
-                if (lastSemiResult.length) {
-
-                    let firstSlide = lastSemiResult.shift();
-                    let lastSlide = result[result.length - 1];
-
-                    result[result.length - 1] = firstSlide;
-
-                    let firstSlideResultPos = result.indexOf(firstSlide);
-                    result[firstSlideResultPos] = lastSlide;
+        if (slide.used) {
+            k++;
+            continue;
+        }
 
 
-                    slide = firstSlide;
-                    category = slide.categories.shift();
 
+        let maxInterestSlide = null;
+        let maxScore = 0;
 
-                } else {
-                    category = null;
+        for (let id = slideIdx; id < slides.length; id++) {
+
+            let slide2 = slides[id];
+
+            if (!slide2.used) {
+
+                let score = calcTransition(slide, slide2);
+
+                if (score > maxScore) {
+                    maxScore = score;
+                    maxInterestSlide = id;
                 }
 
             }
 
         }
 
-    }
-
-    let vRes = [];
-
-    while(result.length) {
-        let v1 = result.shift();
-        let v2 = result.shift();
-
-        if (v1 && v2) {
-            vRes.push([v1, v2]);
+        if (!maxInterestSlide) {
+            k++;
+            continue;
         }
+
+        result.push(slide, slides[maxInterestSlide]);
+
+        slides[maxInterestSlide].used = true;
+
+        //slides.splice(maxInterestSlide, 1);
+
+
     }
 
-    download('res', generateResultFromSlides(vRes));
+    console.log("main while",performance.now() - t1);
+
+    download('res', generateResultFromSlides(result));
 }
 
 
@@ -126,7 +130,27 @@ function artem(slides, categoriesH, categoriesV) {
 
 
 
+function calcTransition(s1, s2) {
+    let commonCats = 0, s1Cats = 0, s2Cats = 0;
 
+    s1.categoriesKeys.forEach( v => {
+        let idx = s2.categoriesKeys.indexOf(v);
+       if (idx === -1) {
+           s1Cats++;
+       } else {
+           commonCats++;
+       }
+    });
+
+    s2.categoriesKeys.forEach( v => {
+        let idx = s1.categoriesKeys.indexOf(v);
+        if (idx === -1) {
+            s2Cats++;
+        }
+    });
+
+    return Math.min( commonCats, s2Cats, s1Cats );
+}
 
 
 
@@ -154,6 +178,8 @@ function getPicsFromCat(category, categories) {
 
 
 
+
+
 function generateResultFromSlides(slides) {
     slides = slides.map(v => {
         if (v.id !== undefined) {
@@ -165,6 +191,9 @@ function generateResultFromSlides(slides) {
 
     return slides.length + '\n' + slides.join('\n');
 }
+
+
+
 
 
 
@@ -204,20 +233,25 @@ function getArraysFromText(text) {
     let formattedInput = text.split(/\n/).map((v, id) => {
         let parsedV = v.split(' ');
 
-        let categories = [];
+        let categories = {};
+        let categoriesSize = 0;
+        let categoriesKeys = [];
 
         for (let i = 0; i <= parsedV[1]; ++i) {
 
             if (parsedV[i + 2]) {
-                categories.push(parsedV[i + 2]);
+                categories[parsedV[i + 2]] = 1;
+                categoriesKeys.push(parsedV[i + 2]);
+                categoriesSize++;
             }
         }
-
+        categoriesKeys.sort();
         return {
             id: id - 1,
             used: false,
-            categoriesSize: categories.length,
+            categoriesSize,
             type: parsedV[0],
+            categoriesKeys,
             categories
         };
     });
@@ -233,7 +267,7 @@ function categoriesFromSlides(slides) {
     let categoriesH = {};
     let categoriesV = {};
 
-    slides.forEach(slide => slide.categories.forEach(val => {
+    slides.forEach(slide => slide.categoriesKeys.forEach(val => {
         if (slide.type === "H") {
             if (categoriesH[val]) {
                 categoriesH[val].push(slide);
