@@ -1,57 +1,15 @@
 function onChange(e) {
-    var input = event.target;
 
-    var reader = new FileReader();
+    let input = event.target;
+    let reader = new FileReader();
 
-    console.log("change");
     reader.onload = function () {
-        console.log("Load");
-        var text = reader.result;
 
-        let formatedInput = text.split(/\n/).map((v, id) => {
-            let parsedV = v.split(' ');
+        let slides = getArraysFromText(reader.result);
 
-            let categories = [];
+        let categories = categoriesFromSlides(slides);
 
-            for (let i = 0; i <= parsedV[1]; ++i) {
-
-                if (parsedV[i + 2]) {
-                    categories.push(parsedV[i + 2]);
-                }
-            }
-
-            return {
-                id: id - 1,
-                used: false,
-                categoriesSize: categories.length,
-                type: parsedV[0],
-                categories
-            };
-        });
-
-        formatedInput.shift();
-        formatedInput.length--;
-
-        let categoriesH = {};
-        let categoriesV = {};
-
-        formatedInput.forEach(slide => slide.categories.forEach(val => {
-            if (slide.type === "H") {
-                if (categoriesH[val]) {
-                    categoriesH[val].push(slide);
-                } else {
-                    categoriesH[val] = [slide];
-                }
-            } else {
-                if (categoriesV[val]) {
-                    categoriesV[val].push(slide);
-                } else {
-                    categoriesV[val] = [slide];
-                }
-            }
-        }));
-
-        artem(formatedInput, categoriesH, categoriesV)
+        artem(slides, categories.categoriesH, categories.categoriesV);
     };
 
     reader.readAsText(input.files[0]);
@@ -59,119 +17,145 @@ function onChange(e) {
 
 window.onChange = onChange;
 
-function artem(input, categoriesH, categoriesV) {
-    console.log(input);
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+function artem(slides, categoriesH, categoriesV) {
     let result = [];
 
+    let slide = slides[0];
+    let category = slide.categories.shift();
+    let lastSemiResult;
 
+    while(category) {
 
-    let startedPic = input[0];
-    let usedPics = 1;
-    startedPic.used = true;
+        let addedPics = getPicsFromCat(category, categoriesV);
 
-    function getPic(startedPic) {
-        startedPic.categories.forEach(cat => {
-            categoriesH[cat].forEach(pic => {
-                if (!pic.used) {
-                    result.push(pic);
-                    pic.used = true;
-                    getPic(pic);
-                }
-            })
-        });
-    }
+        if (addedPics.addedSlides) {
 
-
-    //result.push(input[0]);
-    //getPic(input[0]);
-
-    //console.log(result);
-
-    let lastCategory;
-    let totalSlides = 0;
-    let keysH = Object.keys(categoriesH).sort();
-
-    let usedCat = {};
-    function getPicsFromCat(cat) {
-        let semiRes = [];
-        let lastAddedPic;
-        categoriesH[cat].forEach(slide => {
-            if (!slide.used) {
-                totalSlides++;
-                semiRes.push(slide);
-                slide.used = true;
-
-                lastAddedPic = slide;
-            }
-        });
-
-        return {semiRes, lastAddedPic}
-    }
-
-    let lastCatId = 0;
-
-    let lastCatName = keysH[lastCatId];
-    let semiSize = 0;
-
-    let replaceTest = 0;
-
-    while(lastCatName) {
-        usedCat[lastCatName] = 1;
-
-        let lastCat = getPicsFromCat(lastCatName);
-
-        if (lastCat.lastAddedPic !== undefined ) {
-            semiSize = lastCat.semiRes.length;
-        }
-
-        if (lastCat.lastAddedPic === undefined ) {
-
-            if (replaceTest >= 0) {
-                let lastResultIdx = result.length - 1;
-                let lastSlide = result[lastResultIdx];
-
-                result[lastResultIdx] = result[ replaceTest ];
-                result[ replaceTest ] = lastSlide;
-                replaceTest--;
-                lastCatName = result[lastResultIdx].categories[ result[lastResultIdx].categoriesSize - 1 ];
-
-                continue;
-            } else {
-                break;
-            }
+            result.push(...addedPics.semiRes);
+            lastSemiResult = addedPics.semiRes;
+            slide = addedPics.semiRes[addedPics.semiRes.length - 1];
 
         } else {
-            replaceTest = lastCat.semiRes.length - 2;
-            result.push( ...lastCat.semiRes );
+
+            if (slide.categories.length) {
+                category = slide.categories.shift();
+            } else {
+
+
+                if (lastSemiResult.length) {
+
+                    let firstSlide = lastSemiResult.shift();
+                    let lastSlide = result[result.length - 1];
+
+                    result[result.length - 1] = firstSlide;
+
+                    let firstSlideResultPos = result.indexOf(firstSlide);
+                    result[firstSlideResultPos] = lastSlide;
+
+
+                    slide = firstSlide;
+                    category = slide.categories.shift();
+
+
+                } else {
+                    category = null;
+                }
+
+            }
+
         }
 
-        let catSize = lastCat.lastAddedPic.categoriesSize;
+    }
 
-        while(catSize > 0) {
+    let vRes = [];
 
-            let currentCat = lastCat.lastAddedPic.categories[catSize - 1];
+    while(result.length) {
+        let v1 = result.shift();
+        let v2 = result.shift();
 
-            if (usedCat[currentCat]) {
-                catSize--;
-            } else {
-                lastCatName = currentCat;
-                break;
-            }
+        if (v1 && v2) {
+            vRes.push([v1, v2]);
         }
     }
 
+    download('res', generateResultFromSlides(vRes));
+}
 
 
-    /*
-        *
-        * предложение бегать по категориям каждой фотографии и выбирать первую подходящую не использованую из этой категории
-        *
-        * */
-    result = result.map(v => {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function getPicsFromCat(category, categories) {
+    let semiRes = [];
+    let lastAddedPic;
+    let addedSlides = 0;
+
+    categories[category].forEach(slide => {
+        if (!slide.used) {
+            addedSlides++;
+            semiRes.push(slide);
+            slide.used = true;
+
+            lastAddedPic = slide;
+        }
+    });
+
+    return {semiRes, lastAddedPic, addedSlides}
+}
+
+
+
+function generateResultFromSlides(slides) {
+    slides = slides.map(v => {
         if (v.id !== undefined) {
             return v.id;
         } else {
@@ -179,47 +163,27 @@ function artem(input, categoriesH, categoriesV) {
         }
     });
 
-    let resStr = result.length + '\n' + result.join('\n');
-    //console.log(result);
-
-    download('res', resStr);
-    //console.log(resStr);
+    return slides.length + '\n' + slides.join('\n');
 }
 
-/*
-* if (currentCatV) {
-            let currentVSlide = [];
-            let vSlideLen = 0;
 
-            currentCatV.forEach(V => {
-                if (vSlideLen < 2 && !V[1] && V.indexOf(nextCat) !== -1) {
-                    currentVSlide.push(V);
-                    V[1] = true;
-                    vSlideLen++;
-                }
-            });
 
-            if (vSlideLen === 2) {
-                result.push(currentVSlide);
+function recursiveGetPics(startedPic, categories) {
+    let semiResult = [];
+
+    startedPic.categories.forEach(category => {
+        categories[category].forEach(pic => {
+            if (!pic.used) {
+                semiResult.push(pic);
+                pic.used = true;
+                recursiveGetPics(pic);
             }
+        })
+    });
 
-        } else {
-            let idx = result.length - 1;
+    return {semiResult};
+}
 
-            while (idx >= startCatIdx) {
-                let lastResCats = [];
-
-                let idx = idx === undefined ? result.length - 1 : --idx;
-
-                result[idx].forEach((v, id) => {
-                    if (id >= 4) {
-                        lastResCats.push(v);
-                    }
-                });
-            }
-
-        }
-        */
 
 
 function download(filename, text) {
@@ -233,4 +197,57 @@ function download(filename, text) {
     element.click();
 
     document.body.removeChild(element);
+}
+
+
+function getArraysFromText(text) {
+    let formattedInput = text.split(/\n/).map((v, id) => {
+        let parsedV = v.split(' ');
+
+        let categories = [];
+
+        for (let i = 0; i <= parsedV[1]; ++i) {
+
+            if (parsedV[i + 2]) {
+                categories.push(parsedV[i + 2]);
+            }
+        }
+
+        return {
+            id: id - 1,
+            used: false,
+            categoriesSize: categories.length,
+            type: parsedV[0],
+            categories
+        };
+    });
+
+    formattedInput.shift();
+    formattedInput.length--;
+
+    return formattedInput;
+}
+
+
+function categoriesFromSlides(slides) {
+    let categoriesH = {};
+    let categoriesV = {};
+
+    slides.forEach(slide => slide.categories.forEach(val => {
+        if (slide.type === "H") {
+            if (categoriesH[val]) {
+                categoriesH[val].push(slide);
+            } else {
+                categoriesH[val] = [slide];
+            }
+        } else {
+            if (categoriesV[val]) {
+                categoriesV[val].push(slide);
+            } else {
+                categoriesV[val] = [slide];
+            }
+        }
+    }));
+
+    return {categoriesH, categoriesV}
 }
