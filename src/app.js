@@ -7,9 +7,9 @@ function onChange(e) {
 
         let slides = getArraysFromText(reader.result);
 
-        let categories = categoriesFromSlides(slides);
+        //let categories = categoriesFromSlides(slides);
 
-        artem(slides, categories.categoriesH, categories.categoriesV);
+        artem(slides);
     };
 
     reader.readAsText(input.files[0]);
@@ -18,145 +18,103 @@ function onChange(e) {
 window.onChange = onChange;
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-function artem(slides, categoriesH, categoriesV) {
+function artem(slides, categoriesH) {
 
     let result = [];
 
-    slides.sort(function (a, b) {
-       return a.categoriesSize - b.categoriesSize;
-    }).splice(Math.floor(slides.length / 2), Math.floor(slides.length / 3) * 2);
+    makeHFromV(slides);
+    slides = slides.filter(slide => slide.type === "H");
 
-    let k = 53332;
+    categoriesH = categoriesFromSlides(slides).categoriesH;
+
+
     let t1 = performance.now();
-    let slideIdx = 0;
-    let slidesLength = slides.length;
 
-    while(k--) {
+    while (true) {
+        let nextUnused = slides.find(v => !v.used);
 
-        let slide = slides[slideIdx++];
-
-        if (!slide) {
+        if (!nextUnused) {
             break;
         }
+        nextUnused.used = true;
+        result.push(nextUnused);
+        let k = 40000;
+        let slideIdx = result.length - 1;
 
-        if (slide.used) {
-            k++;
-            continue;
-        }
+        while (k--) {
 
+            let slide = result[slideIdx++];
 
+            if (!slide) {
+                break;
+            }
 
-        let maxInterestSlide = null;
-        let maxScore = 0;
+            let maxInterestSlide = null;
+            let maxScore = 0;
 
-        for (let id = slideIdx; id < slides.length; id++) {
+            slide.categoriesKeys.forEach(categoryKey => {
 
-            let slide2 = slides[id];
+                if (!categoriesH[categoryKey].used) {
+                    let availableSlides = false;
+                    categoriesH[categoryKey].slides.forEach(slide2 => {
 
-            if (!slide2.used) {
+                        if (!slide2.used) {
 
-                let score = calcTransition(slide, slide2);
+                            availableSlides = true;
 
-                if (score > maxScore) {
-                    maxScore = score;
-                    maxInterestSlide = id;
+                            let score = calcTransition(slide, slide2);
+
+                            if (score > maxScore) {
+                                maxScore = score;
+                                maxInterestSlide = slide2;
+                            }
+
+                        }
+                    });
+
+                    if (!availableSlides) categoriesH[categoryKey].used = true;
                 }
+            });
 
+            if (!maxInterestSlide) {
+                k++;
+            } else {
+                result.push(maxInterestSlide);
+
+                maxInterestSlide.used = true;
             }
 
         }
 
-        if (!maxInterestSlide) {
-            k++;
-            continue;
-        }
-
-        result.push(slide, slides[maxInterestSlide]);
-
-        slides[maxInterestSlide].used = true;
-
-        //slides.splice(maxInterestSlide, 1);
-
-
     }
 
-    console.log("main while",performance.now() - t1);
+    console.log("main while", performance.now() - t1);
 
     download('res', generateResultFromSlides(result));
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function calcTransition(s1, s2) {
     let commonCats = 0, s1Cats = 0, s2Cats = 0;
 
-    s1.categoriesKeys.forEach( v => {
+    s1.categoriesKeys.forEach(v => {
         let idx = s2.categoriesKeys.indexOf(v);
-       if (idx === -1) {
-           s1Cats++;
-       } else {
-           commonCats++;
-       }
+        if (idx === -1) {
+            s1Cats++;
+        } else {
+            commonCats++;
+        }
     });
 
-    s2.categoriesKeys.forEach( v => {
+    s2.categoriesKeys.forEach(v => {
         let idx = s1.categoriesKeys.indexOf(v);
         if (idx === -1) {
             s2Cats++;
         }
     });
 
-    return Math.min( commonCats, s2Cats, s1Cats );
+    return Math.min(commonCats, s2Cats, s1Cats);
 }
-
-
-
-
-
-
 
 function getPicsFromCat(category, categories) {
     let semiRes = [];
@@ -177,24 +135,17 @@ function getPicsFromCat(category, categories) {
 }
 
 
-
-
-
 function generateResultFromSlides(slides) {
     slides = slides.map(v => {
-        if (v.id !== undefined) {
+        if (v.id[0] === undefined) {
             return v.id;
         } else {
-            return v[0].id + ' ' + v[1].id;
+            return v.id[0] + ' ' + v.id[1];
         }
     });
 
     return slides.length + '\n' + slides.join('\n');
 }
-
-
-
-
 
 
 function recursiveGetPics(startedPic, categories) {
@@ -214,9 +165,9 @@ function recursiveGetPics(startedPic, categories) {
 }
 
 
-
 function download(filename, text) {
-    var element = document.createElement('a');
+    let element = document.createElement('a');
+
     element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
     element.setAttribute('download', filename);
 
@@ -230,31 +181,50 @@ function download(filename, text) {
 
 
 function getArraysFromText(text) {
-    let formattedInput = text.split(/\n/).map((v, id) => {
-        let parsedV = v.split(' ');
+    let totalCategories = {};
+    let categoriesCount = 0;
 
-        let categories = {};
-        let categoriesSize = 0;
-        let categoriesKeys = [];
+    let formattedInput = text.split(/\n/)
+        .map(v => {
+            let parsedV = v.split(' ');
 
-        for (let i = 0; i <= parsedV[1]; ++i) {
-
-            if (parsedV[i + 2]) {
-                categories[parsedV[i + 2]] = 1;
-                categoriesKeys.push(parsedV[i + 2]);
-                categoriesSize++;
+            for (let i = 0; i <= parsedV[1]; ++i) {
+                if (parsedV[i + 2]) {
+                    totalCategories[parsedV[i + 2]] = categoriesCount++;
+                }
             }
-        }
-        categoriesKeys.sort();
-        return {
-            id: id - 1,
-            used: false,
-            categoriesSize,
-            type: parsedV[0],
-            categoriesKeys,
-            categories
-        };
-    });
+
+            return v.split(' ');
+
+        }).map((parsedV, id) => {
+            let categories = {};
+            let categoriesSize = 0;
+            let categoriesKeys = [];
+            let categoriesIds = [];
+
+            for (let i = 0; i <= parsedV[1]; ++i) {
+
+                if (parsedV[i + 2]) {
+                    categories[parsedV[i + 2]] = 1;
+                    categoriesKeys.push(parsedV[i + 2]);
+                    categoriesSize++;
+
+                    categoriesIds[totalCategories[parsedV[i + 2]]] = true;
+                }
+            }
+
+            categoriesKeys.sort();
+            return {
+                id: id - 1,
+                used: false,
+                categoriesSize,
+                united: false,
+                categoriesIds,
+                type: parsedV[0],
+                categoriesKeys,
+                categories
+            };
+        });
 
     formattedInput.shift();
     formattedInput.length--;
@@ -264,24 +234,99 @@ function getArraysFromText(text) {
 
 
 function categoriesFromSlides(slides) {
-    let categoriesH = {};
-    let categoriesV = {};
+    let categoriesH = {
+        keys: []
+    };
+
+    let categoryIds = {
+        keys: []
+    };
 
     slides.forEach(slide => slide.categoriesKeys.forEach(val => {
         if (slide.type === "H") {
             if (categoriesH[val]) {
-                categoriesH[val].push(slide);
+                categoriesH[val].slides.push(slide);
             } else {
-                categoriesH[val] = [slide];
-            }
-        } else {
-            if (categoriesV[val]) {
-                categoriesV[val].push(slide);
-            } else {
-                categoriesV[val] = [slide];
+                categoriesH[val] = {};
+                categoriesH.keys.push(val);
+                categoriesH[val].used = false;
+                categoriesH[val].slides = [slide];
             }
         }
     }));
 
-    return {categoriesH, categoriesV}
+    return {categoriesH, categoryIds}
+}
+
+function makeHFromV(slides) {
+    let slidesV = slides.filter(v => v.type === 'V');
+
+    let slide;
+
+    while (true) {
+        slide = slidesV.find(v => !v.united);
+
+        if (!slide) break;
+
+        let intersectionCount = Infinity;
+        let minIntersecSlide = null;
+
+        for (let i = 0; i < slidesV.length; i++) {
+            let slide2 = slidesV[i];
+
+            if (!slide2.united && slide2 !== slide) {
+                let newIntersection = intersection(slide, slide2);
+
+                if (newIntersection === 0) {
+                    minIntersecSlide = slide2;
+                    break;
+                } else if (newIntersection < intersectionCount) {
+                    minIntersecSlide = slide2;
+                    intersectionCount = newIntersection;
+                }
+            }
+        }
+
+        slides.push({
+            id: [slide.id, minIntersecSlide.id],
+            categoriesKeys: arrayUnique(slide.categoriesKeys.concat(minIntersecSlide.categoriesKeys)),
+            type: 'H'
+        });
+
+        slide.united = minIntersecSlide.united = true;
+    }
+
+}
+
+
+function intersection(a, b) {
+    let ai = 0, bi = 0;
+    let result = 0;
+
+    while (ai < a.length && bi < b.length) {
+        if (a[ai] < b[bi]) {
+            ai++;
+        } else if (a[ai] > b[bi]) {
+            bi++;
+        } else /* they're equal */
+        {
+            result++;
+            ai++;
+            bi++;
+        }
+    }
+
+    return result;
+}
+
+function arrayUnique(array) {
+    let a = array.concat();
+    for (let i = 0; i < a.length; ++i) {
+        for (let j = i + 1; j < a.length; ++j) {
+            if (a[i] === a[j])
+                a.splice(j--, 1);
+        }
+    }
+
+    return a;
 }
