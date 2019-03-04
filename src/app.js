@@ -18,30 +18,33 @@ function onChange(e) {
 window.onChange = onChange;
 
 
-function artem(slides, categoriesH) {
+function artem(slides) {
 
     let result = [];
 
     makeHFromV(slides);
-    slides = slides.filter(slide => slide.type === "H");
+    slides = slides.filter(slide => slide[1] === "H");
 
-    categoriesH = categoriesFromSlides(slides).categoriesH;
-
-
+    let t0 = performance.now();
+    let categoriesIds = categoriesFromSlides(slides);
+    console.log('build cats time', performance.now() - t0);
     let t1 = performance.now();
 
+    let timeToRefreshCategories = 500;
     while (true) {
-        let nextUnused = slides.find(v => !v.used);
+        let nextUnused = slides.find(v => !v[4]);
 
         if (!nextUnused) {
             break;
         }
-        nextUnused.used = true;
+
+        nextUnused[4] = true;
+
         result.push(nextUnused);
-        let k = 40000;
+
         let slideIdx = result.length - 1;
 
-        while (k--) {
+        while (true) {
 
             let slide = result[slideIdx++];
 
@@ -52,36 +55,35 @@ function artem(slides, categoriesH) {
             let maxInterestSlide = null;
             let maxScore = 0;
 
-            slide.categoriesKeys.forEach(categoryKey => {
+            slide[3].forEach(categoryKey => {
+                let categories = categoriesIds[categoryKey];
 
-                if (!categoriesH[categoryKey].used) {
-                    let availableSlides = false;
-                    categoriesH[categoryKey].slides.forEach(slide2 => {
+                categories && categories.forEach(slide2 => {
 
-                        if (!slide2.used) {
+                    if (!slide2[4]) {
 
-                            availableSlides = true;
+                        let score = calcTransition(slide, slide2);
 
-                            let score = calcTransition(slide, slide2);
-
-                            if (score > maxScore) {
-                                maxScore = score;
-                                maxInterestSlide = slide2;
-                            }
-
+                        if (score > maxScore) {
+                            maxScore = score;
+                            maxInterestSlide = slide2;
                         }
-                    });
 
-                    if (!availableSlides) categoriesH[categoryKey].used = true;
-                }
+                    }
+                });
             });
 
-            if (!maxInterestSlide) {
-                k++;
-            } else {
+            if (maxInterestSlide) {
                 result.push(maxInterestSlide);
 
-                maxInterestSlide.used = true;
+                maxInterestSlide[4] = true;
+
+                timeToRefreshCategories--;
+
+                if (!timeToRefreshCategories) {
+                    categoriesIds = categoriesFromSlides(slides);
+                    timeToRefreshCategories = 500;
+                }
             }
 
         }
@@ -93,27 +95,17 @@ function artem(slides, categoriesH) {
     download('res', generateResultFromSlides(result));
 }
 
-
 function calcTransition(s1, s2) {
-    let commonCats = 0, s1Cats = 0, s2Cats = 0;
+    let commonCats = 0;
+    let categoriesS1 = s2[2];
 
-    s1.categoriesKeys.forEach(v => {
-        let idx = s2.categoriesKeys.indexOf(v);
-        if (idx === -1) {
-            s1Cats++;
-        } else {
+    s1[3].forEach(v => {
+        if (categoriesS1[v]) {
             commonCats++;
         }
     });
 
-    s2.categoriesKeys.forEach(v => {
-        let idx = s1.categoriesKeys.indexOf(v);
-        if (idx === -1) {
-            s2Cats++;
-        }
-    });
-
-    return Math.min(commonCats, s2Cats, s1Cats);
+    return Math.min(commonCats, s1[3].length - commonCats, s2[3].length - commonCats);
 }
 
 function getPicsFromCat(category, categories) {
@@ -137,31 +129,14 @@ function getPicsFromCat(category, categories) {
 
 function generateResultFromSlides(slides) {
     slides = slides.map(v => {
-        if (v.id[0] === undefined) {
-            return v.id;
+        if (v[0][0] === undefined) {
+            return v[0];
         } else {
-            return v.id[0] + ' ' + v.id[1];
+            return v[0][0] + ' ' + v[0][1];
         }
     });
 
     return slides.length + '\n' + slides.join('\n');
-}
-
-
-function recursiveGetPics(startedPic, categories) {
-    let semiResult = [];
-
-    startedPic.categories.forEach(category => {
-        categories[category].forEach(pic => {
-            if (!pic.used) {
-                semiResult.push(pic);
-                pic.used = true;
-                recursiveGetPics(pic);
-            }
-        })
-    });
-
-    return {semiResult};
 }
 
 
@@ -189,7 +164,7 @@ function getArraysFromText(text) {
             let parsedV = v.split(' ');
 
             for (let i = 0; i <= parsedV[1]; ++i) {
-                if (parsedV[i + 2]) {
+                if (parsedV[i + 2] && totalCategories[parsedV[i + 2]] === undefined) {
                     totalCategories[parsedV[i + 2]] = categoriesCount++;
                 }
             }
@@ -197,33 +172,19 @@ function getArraysFromText(text) {
             return v.split(' ');
 
         }).map((parsedV, id) => {
-            let categories = {};
-            let categoriesSize = 0;
-            let categoriesKeys = [];
             let categoriesIds = [];
+            let categoriesIdsAsKey = [];
 
             for (let i = 0; i <= parsedV[1]; ++i) {
 
                 if (parsedV[i + 2]) {
-                    categories[parsedV[i + 2]] = 1;
-                    categoriesKeys.push(parsedV[i + 2]);
-                    categoriesSize++;
 
                     categoriesIds[totalCategories[parsedV[i + 2]]] = true;
+                    categoriesIdsAsKey.push(totalCategories[parsedV[i + 2]]);
                 }
             }
 
-            categoriesKeys.sort();
-            return {
-                id: id - 1,
-                used: false,
-                categoriesSize,
-                united: false,
-                categoriesIds,
-                type: parsedV[0],
-                categoriesKeys,
-                categories
-            };
+            return [id - 1, parsedV[0], categoriesIds, categoriesIdsAsKey];
         });
 
     formattedInput.shift();
@@ -234,67 +195,46 @@ function getArraysFromText(text) {
 
 
 function categoriesFromSlides(slides) {
-    let categoriesH = {
-        keys: []
-    };
 
-    let categoryIds = {
-        keys: []
-    };
+    let categoriesIds = [];
 
-    slides.forEach(slide => slide.categoriesKeys.forEach(val => {
-        if (slide.type === "H") {
-            if (categoriesH[val]) {
-                categoriesH[val].slides.push(slide);
-            } else {
-                categoriesH[val] = {};
-                categoriesH.keys.push(val);
-                categoriesH[val].used = false;
-                categoriesH[val].slides = [slide];
-            }
+    slides.forEach(slide => {
+        if (!slide[4] && !slide[5] && !slide[6]) {
+            slide[3].forEach(val => {
+                if (categoriesIds[val]) {
+                    categoriesIds[val].push(slide);
+                } else {
+                    categoriesIds[val] = [slide];
+                }
+            });
         }
-    }));
+    });
 
-    return {categoriesH, categoryIds}
+    return categoriesIds;
 }
 
-function makeHFromV(slides) {
-    let slidesV = slides.filter(v => v.type === 'V');
+function makeHFromV(sls) {
+    let slsV = sls.filter(v => v[1] === 'V').sort((a, b) => a[3].length - b[3].length);
 
-    let slide;
+    let t1 = performance.now();
 
-    while (true) {
-        slide = slidesV.find(v => !v.united);
+    for (let i = 0, i2 = slsV.length - 1; i < (slsV.length / 2); i++, i2--) {
+        let s = slsV[i];
+        let s2 = slsV[i2];
 
-        if (!slide) break;
+        let hSlide = Array(7);
+        hSlide[0] = [s[0], s2[0]];
+        hSlide[1] = 'H';
+        hSlide[2] = arrayIndexes(s[2], s2[2]);
+        hSlide[3] = arrayUnique(s[3].concat(s2[3]));
 
-        let intersectionCount = Infinity;
-        let minIntersecSlide = null;
+        sls.push(hSlide);
 
-        for (let i = 0; i < slidesV.length; i++) {
-            let slide2 = slidesV[i];
+        s[5] = s2[5] = true;
 
-            if (!slide2.united && slide2 !== slide) {
-                let newIntersection = intersection(slide, slide2);
-
-                if (newIntersection === 0) {
-                    minIntersecSlide = slide2;
-                    break;
-                } else if (newIntersection < intersectionCount) {
-                    minIntersecSlide = slide2;
-                    intersectionCount = newIntersection;
-                }
-            }
-        }
-
-        slides.push({
-            id: [slide.id, minIntersecSlide.id],
-            categoriesKeys: arrayUnique(slide.categoriesKeys.concat(minIntersecSlide.categoriesKeys)),
-            type: 'H'
-        });
-
-        slide.united = minIntersecSlide.united = true;
     }
+
+    console.log(performance.now() - t1, 'generate H slides');
 
 }
 
@@ -329,4 +269,12 @@ function arrayUnique(array) {
     }
 
     return a;
+}
+
+function arrayIndexes(arr, arr2) {
+    arr.forEach((v, idx) => {
+        arr2[idx] = true;
+    });
+
+    return arr2;
 }
