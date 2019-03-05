@@ -22,21 +22,34 @@ function artem(slides) {
 
     let result = [];
 
-    makeHFromV(slides);
-    slides = slides.filter(slide => slide[1] === "H");
+    //makeHFromV(slides);
+    let slidesV = [];
+    let slidesH = [];
+
+    slides.forEach(slide => {
+        if (slide[1] === true) {
+            slidesH.push(slide);
+        } else {
+            slidesV.push(slide);
+        }
+    });
 
     let t0 = performance.now();
-    let categoriesIds = categoriesFromSlides(slides);
+
+    let categoriesHIds = categoriesFromSlides(slidesH);
+
     console.log('build cats time', performance.now() - t0);
+
+
     let t1 = performance.now();
 
     let timeToRefreshCategories = 500;
-    while (true) {
-        let nextUnused = slides.find(v => !v[4]);
 
-        if (!nextUnused) {
-            break;
-        }
+    while (true) {
+
+        let nextUnused = slidesH.find(v => !v[4]);
+
+        if (!nextUnused) break;
 
         nextUnused[4] = true;
 
@@ -54,23 +67,56 @@ function artem(slides) {
 
             let maxInterestSlide = null;
             let maxScore = 0;
+            let reqIntersections = Math.floor(slide[3].length / 2);
+            let verticals = [];
 
             slide[3].forEach(categoryKey => {
-                let categories = categoriesIds[categoryKey];
+
+                let categories = categoriesHIds[categoryKey];
 
                 categories && categories.forEach(slide2 => {
 
-                    if (!slide2[4]) {
+                    if (!slide2[7] && !slide2[4]) { // is checked/used?
 
-                        let score = calcTransition(slide, slide2);
+                        if (slide[1]) { // is horizontal?
 
-                        if (score > maxScore) {
-                            maxScore = score;
-                            maxInterestSlide = slide2;
+                            let score = calcTransition(slide, slide2);
+
+                            if (score > maxScore) {
+                                maxScore = score;
+                                maxInterestSlide = slide2;
+                            }
+
+                        } else {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
                         }
 
+                        slide2[7] = true;
                     }
+
+
                 });
+            });
+
+            slide[3].forEach(categoryKey => {
+
+                let categories = categoriesHIds[categoryKey];
+
+                categories && categories.forEach(slide2 => slide2[7] = false );
             });
 
             if (maxInterestSlide) {
@@ -81,10 +127,14 @@ function artem(slides) {
                 timeToRefreshCategories--;
 
                 if (!timeToRefreshCategories) {
-                    categoriesIds = categoriesFromSlides(slides);
+                    categoriesHIds = categoriesFromSlides(slidesH);
                     timeToRefreshCategories = 500;
                 }
             }
+
+           /* slides.forEach( slide => {
+                slide[7] = false;
+            });*/
 
         }
 
@@ -184,7 +234,7 @@ function getArraysFromText(text) {
                 }
             }
 
-            return [id - 1, parsedV[0], categoriesIds, categoriesIdsAsKey];
+            return formatSlide(id - 1, parsedV[0] === 'H', categoriesIds, categoriesIdsAsKey);
         });
 
     formattedInput.shift();
@@ -214,7 +264,7 @@ function categoriesFromSlides(slides) {
 }
 
 function makeHFromV(sls) {
-    let slsV = sls.filter(v => v[1] === 'V').sort((a, b) => a[3].length - b[3].length);
+    let slsV = sls.filter(v => v[1] === false).sort((a, b) => a[3].length - b[3].length);
 
     let t1 = performance.now();
 
@@ -222,13 +272,7 @@ function makeHFromV(sls) {
         let s = slsV[i];
         let s2 = slsV[i2];
 
-        let hSlide = Array(7);
-        hSlide[0] = [s[0], s2[0]];
-        hSlide[1] = 'H';
-        hSlide[2] = arrayIndexes(s[2], s2[2]);
-        hSlide[3] = arrayUnique(s[3].concat(s2[3]));
-
-        sls.push(hSlide);
+        sls.push(formatSlide([s[0], s2[0]], true, arrayIndexes(s[2], s2[2]), arrayUnique(s[3].concat(s2[3]))));
 
         s[5] = s2[5] = true;
 
@@ -248,8 +292,7 @@ function intersection(a, b) {
             ai++;
         } else if (a[ai] > b[bi]) {
             bi++;
-        } else /* they're equal */
-        {
+        } else {
             result++;
             ai++;
             bi++;
@@ -277,4 +320,23 @@ function arrayIndexes(arr, arr2) {
     });
 
     return arr2;
+}
+
+function findSame(slides) {
+
+}
+
+
+function formatSlide(id, type, categoriesIds, categoryKeys, used, united, lazed, checked) {
+    let hSlide = Array(8);
+    hSlide[0] = id;
+    hSlide[1] = type;
+    hSlide[2] = categoriesIds;
+    hSlide[3] = categoryKeys;
+    hSlide[4] = used;
+    hSlide[5] = united;
+    hSlide[6] = lazed;
+    hSlide[7] = checked;
+
+    return hSlide;
 }
