@@ -22,11 +22,10 @@ function artem(slides) {
 
     let result = [];
 
-    //makeHFromV(slides);
     let slidesV = [];
     let slidesH = [];
 
-    slides.forEach(slide => {
+    slides.sort((a, b) => a[3].length - b[3].length).forEach(slide => {
         if (slide[1] === true) {
             slidesH.push(slide);
         } else {
@@ -36,7 +35,7 @@ function artem(slides) {
 
     let t0 = performance.now();
 
-    let categoriesHIds = categoriesFromSlides(slidesH);
+    let categoriesHIds = categoriesFromSlides(slides);
 
     console.log('build cats time', performance.now() - t0);
 
@@ -47,7 +46,8 @@ function artem(slides) {
 
     while (true) {
 
-        let nextUnused = slidesH.find(v => !v[4]);
+
+        let nextUnused = getStartSlide(slidesH, slidesV);
 
         if (!nextUnused) break;
 
@@ -57,7 +57,9 @@ function artem(slides) {
 
         let slideIdx = result.length - 1;
 
+
         while (true) {
+
 
             let slide = result[slideIdx++];
 
@@ -67,59 +69,94 @@ function artem(slides) {
 
             let maxInterestSlide = null;
             let maxScore = 0;
-            let reqIntersections = Math.floor(slide[3].length / 2);
-            let verticals = [];
-
-            slide[3].forEach(categoryKey => {
-
-                let categories = categoriesHIds[categoryKey];
-
-                categories && categories.forEach(slide2 => {
-
-                    if (!slide2[7] && !slide2[4]) { // is checked/used?
-
-                        if (slide[1]) { // is horizontal?
-
-                            let score = calcTransition(slide, slide2);
-
-                            if (score > maxScore) {
-                                maxScore = score;
-                                maxInterestSlide = slide2;
-                            }
-
-                        } else {
+            let intersV = [];
 
 
+            forEachSlidersInSlideCategories(slide, categoriesHIds, slide2 => {
 
+                if (!slide2[7] && !slide2[4]) { // is checked/used?
 
+                    if (slide2[1]) { // is horizontal?
 
+                        let score = calcTransitionCoeff(slide2[2], slide[3], slide2[3]);
 
-
-
-
-
-
-
-
-
-
+                        if (score > maxScore) {
+                            maxScore = score;
+                            maxInterestSlide = slide2;
                         }
 
-                        slide2[7] = true;
+                    } else {
+
+                        let intersect = intersection(slide[3], slide2[3]);
+
+                        if (intersect.total > 2) {
+                            intersV.push({
+                                slide: slide2,
+                                intersectionCount: intersect.total,
+                                intersections: intersect.result
+                            });
+                        }
+
                     }
 
+                    slide2[7] = true;
+                }
 
-                });
+
             });
 
-            slide[3].forEach(categoryKey => {
 
-                let categories = categoriesHIds[categoryKey];
+            forEachSlidersInSlideCategories(slide, categoriesHIds, slide2 => slide2[7] = false);
 
-                categories && categories.forEach(slide2 => slide2[7] = false );
-            });
+
+            if (intersV.length > 1) {
+
+                //intersV.sort((a, b) => a.intersectionCount - b.intersectionCount);
+
+
+                let pic1, maxPic1, pic2, maxPic2, moreInterest;
+
+                for (let i = intersV.length - 1; i > 0; i--) {
+
+                    let v1 = intersV[i];
+                    pic1 = v1.slide;
+
+
+                    for (let i2 = i - 1; i2 >= 0; i2--) {
+
+                        let v2 = intersV[i2];
+                        pic2 = v2.slide;
+
+
+                        let commons = arrayUnique(pic1[3].concat(pic2[3]));
+
+                        let indexes = arrayIndexes(pic1[2].map(v => v), pic2[2].map(v => v));
+
+                        let score = calcTransitionCoeff(indexes, slide[3], commons);
+
+                        if (score > maxScore) {
+                            maxScore = score;
+                            maxInterestSlide = formatSlide([pic1[0], pic2[0]], true,
+                                indexes,
+                                commons.sort(( a,b ) => a - b)
+                            );
+                            moreInterest = true;
+                            maxPic1 = pic1;
+                            maxPic2 = pic2;
+                        }
+
+                    }
+
+                }
+
+
+                if (moreInterest) maxPic1[4] = maxPic2[4] = true;
+
+            }
+
 
             if (maxInterestSlide) {
+
                 result.push(maxInterestSlide);
 
                 maxInterestSlide[4] = true;
@@ -127,27 +164,107 @@ function artem(slides) {
                 timeToRefreshCategories--;
 
                 if (!timeToRefreshCategories) {
-                    categoriesHIds = categoriesFromSlides(slidesH);
+                    categoriesHIds = categoriesFromSlides(slides);
                     timeToRefreshCategories = 500;
                 }
             }
 
-           /* slides.forEach( slide => {
-                slide[7] = false;
-            });*/
 
         }
-
     }
 
     console.log("main while", performance.now() - t1);
 
-    download('res', generateResultFromSlides(result));
+    showResult(result);
 }
+
+
+function showResult(result) {
+
+    let sum = 0;
+
+    for (let i = 0; i < result.length; i++) {
+        let a = result[i];
+        let b = result[i + 1];
+        if (b) {
+            sum += calcTransition(a, b);
+        }
+
+    }
+
+    console.log(sum, result.length, sum / result.length);
+
+    download('res', generateResultFromSlides(result));
+
+}
+
+
+function getVerticalSlide(sls) {
+    let v1, v2, intersec = Infinity;
+
+    v1 = sls.find(v => !v[4]);
+
+    if (v1) {
+        for (let i = 0; i < sls.length; i++) {
+            let tmpV2 = sls[i];
+
+            if (!tmpV2[4] && tmpV2 !== v1) {
+                let tmpInter = intersection(tmpV2[3], v1[3]).total;
+
+                if (tmpInter === 0) {
+
+                    v2 = tmpV2;
+
+                    break;
+                } else if (tmpInter < intersec) {
+                    intersec = tmpInter;
+                    v2 = tmpV2;
+                }
+            }
+        }
+
+        let nextUnused = formatSlide([v1[0], v2[0]], true,
+            arrayIndexes(v1[2].map(v => v), v2[2].map(v => v)),
+            arrayUnique(v1[3].concat(v2[3]))
+        );
+
+        v1[4] = v2[4] = true;
+
+        return nextUnused;
+    }
+
+}
+
+
+function forEachSlidersInSlideCategories(slide, categoriesHIds, fn) {
+    slide[3].forEach(categoryKey => {
+
+        let categories = categoriesHIds[categoryKey];
+
+        categories && categories.forEach(fn);
+    });
+}
+
+
+function getStartSlide(slidesH, slidesV) {
+    let hSlide = slidesH.find(v => !v[4] && v[3].length > 1);
+
+    if (hSlide) {
+        return hSlide
+
+    } else if (slidesV.length > 1) {
+
+        return getVerticalSlide(slidesV);
+
+    }
+
+}
+
 
 function calcTransition(s1, s2) {
     let commonCats = 0;
     let categoriesS1 = s2[2];
+
 
     s1[3].forEach(v => {
         if (categoriesS1[v]) {
@@ -157,6 +274,28 @@ function calcTransition(s1, s2) {
 
     return Math.min(commonCats, s1[3].length - commonCats, s2[3].length - commonCats);
 }
+
+
+function calcTransitionCoeff(s2CatsBooleans, s1Cats, s2Cats) {
+    let commonCats = 0;
+
+
+    s1Cats.forEach(v => {
+        if (s2CatsBooleans[v]) {
+            commonCats++;
+        }
+    });
+
+    return calcCoeff(s1Cats.length, s2Cats.length, commonCats);
+}
+
+function calcCoeff(s1CatsLength, s2CatsLength, commonLength) {
+    let min = Math.min(commonLength, s1CatsLength - commonLength, s2CatsLength - commonLength);
+
+
+    return min / (commonLength + s1CatsLength - commonLength + s2CatsLength - commonLength);
+}
+
 
 function getPicsFromCat(category, categories) {
     let semiRes = [];
@@ -176,6 +315,8 @@ function getPicsFromCat(category, categories) {
     return {semiRes, lastAddedPic, addedSlides}
 }
 
+let b = () => {
+};
 
 function generateResultFromSlides(slides) {
     slides = slides.map(v => {
@@ -214,14 +355,15 @@ function getArraysFromText(text) {
             let parsedV = v.split(' ');
 
             for (let i = 0; i <= parsedV[1]; ++i) {
-                if (parsedV[i + 2] && totalCategories[parsedV[i + 2]] === undefined) {
+                if (parsedV[i + 2] && !totalCategories[parsedV[i + 2]]) {
                     totalCategories[parsedV[i + 2]] = categoriesCount++;
                 }
             }
 
             return v.split(' ');
 
-        }).map((parsedV, id) => {
+        })
+        .map((parsedV, id) => {
             let categoriesIds = [];
             let categoriesIdsAsKey = [];
 
@@ -234,7 +376,7 @@ function getArraysFromText(text) {
                 }
             }
 
-            return formatSlide(id - 1, parsedV[0] === 'H', categoriesIds, categoriesIdsAsKey);
+            return formatSlide(id - 1, parsedV[0] === 'H', categoriesIds, categoriesIdsAsKey.sort((a, b) => a - b ));
         });
 
     formattedInput.shift();
@@ -264,7 +406,9 @@ function categoriesFromSlides(slides) {
 }
 
 function makeHFromV(sls) {
-    let slsV = sls.filter(v => v[1] === false).sort((a, b) => a[3].length - b[3].length);
+    let slsV = sls
+        .filter(v => v[1] === false)
+        .sort((a, b) => a[3].length - b[3].length);
 
     let t1 = performance.now();
 
@@ -274,7 +418,7 @@ function makeHFromV(sls) {
 
         sls.push(formatSlide([s[0], s2[0]], true, arrayIndexes(s[2], s2[2]), arrayUnique(s[3].concat(s2[3]))));
 
-        s[5] = s2[5] = true;
+        //s[5] = s2[5] = true;
 
     }
 
@@ -285,7 +429,8 @@ function makeHFromV(sls) {
 
 function intersection(a, b) {
     let ai = 0, bi = 0;
-    let result = 0;
+    let result = [];
+    let total = 0;
 
     while (ai < a.length && bi < b.length) {
         if (a[ai] < b[bi]) {
@@ -293,13 +438,14 @@ function intersection(a, b) {
         } else if (a[ai] > b[bi]) {
             bi++;
         } else {
-            result++;
+            total++;
+            result.push(a[ai]);
             ai++;
             bi++;
         }
     }
 
-    return result;
+    return {result, total};
 }
 
 function arrayUnique(array) {
@@ -328,15 +474,5 @@ function findSame(slides) {
 
 
 function formatSlide(id, type, categoriesIds, categoryKeys, used, united, lazed, checked) {
-    let hSlide = Array(8);
-    hSlide[0] = id;
-    hSlide[1] = type;
-    hSlide[2] = categoriesIds;
-    hSlide[3] = categoryKeys;
-    hSlide[4] = used;
-    hSlide[5] = united;
-    hSlide[6] = lazed;
-    hSlide[7] = checked;
-
-    return hSlide;
+    return Array.of.apply(null, arguments);
 }
