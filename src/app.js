@@ -296,28 +296,6 @@ function calcCoeff(s1CatsLength, s2CatsLength, commonLength) {
     return min / (commonLength + s1CatsLength - commonLength + s2CatsLength - commonLength);
 }
 
-
-function getPicsFromCat(category, categories) {
-    let semiRes = [];
-    let lastAddedPic;
-    let addedSlides = 0;
-
-    categories[category].forEach(slide => {
-        if (!slide.used) {
-            addedSlides++;
-            semiRes.push(slide);
-            slide.used = true;
-
-            lastAddedPic = slide;
-        }
-    });
-
-    return {semiRes, lastAddedPic, addedSlides}
-}
-
-let b = () => {
-};
-
 function generateResultFromSlides(slides) {
     slides = slides.map(v => {
         if (v[0][0] === undefined) {
